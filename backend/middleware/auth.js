@@ -11,15 +11,28 @@ if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
 const ACTUAL_SECRET = JWT_SECRET || 'supersecretkeyforjwt';
 
 const authMiddleware = async (req, res, next) => {
+  let token;
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.headers.cookie) {
+    // Parse cookies manually
+    const cookies = req.headers.cookie.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=');
+      acc[key] = value;
+      return acc;
+    }, {});
+    token = cookies.token;
+  }
+
+  if (!token) {
     return res.status(401).json({ message: 'No token, authorization denied' });
   }
 
-  const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, ACTUAL_SECRET);
-    const user = await User.findById(decoded.id); // Updated from findByPk to findById for Mongoose
+    const user = await User.findById(decoded.id);
     if (!user) {
       return res.status(401).json({ message: 'Token is invalid or user not found' });
     }
