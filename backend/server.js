@@ -47,11 +47,8 @@ app.use((err, req, res, next) => {
 // Sync Database and Seed Data
 const seedDatabase = async () => {
   try {
-    // Seed Initial Products
-    const productCount = await Product.countDocuments();
-    if (productCount === 0) {
-      console.log('Seeding initial products into MongoDB...');
-      const productsData = [
+    console.log('Syncing initial products into MongoDB...');
+    const productsData = [
         // Fashion
         {
           name: 'Premium Slim-Fit Denim Jacket',
@@ -319,9 +316,14 @@ const seedDatabase = async () => {
         }
       ];
 
-      await Product.insertMany(productsData); // Insert all 28 products
-      console.log('Initial products seeded successfully!');
+    for (const pData of productsData) {
+      await Product.findOneAndUpdate(
+        { name: pData.name },
+        pData,
+        { upsert: true, new: true }
+      );
     }
+    console.log('Initial products synchronized successfully!');
   } catch (error) {
     console.error('Error seeding database:', error);
   }
