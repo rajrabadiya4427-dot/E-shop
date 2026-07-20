@@ -58,7 +58,7 @@ const seedDatabase = async () => {
           description: 'A classic denim jacket tailored for a modern slim fit, constructed from organic cotton denim with subtle vintage washing.',
           price: 79.99,
           category: 'Fashion',
-          image_url: 'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=600&q=80',
+          image_url: '/IMGS/Premium Slim-Fit Denim Jacket.jpg',
           stock: 45,
           tag: 'trending'
         },
