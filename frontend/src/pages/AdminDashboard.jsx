@@ -219,8 +219,11 @@ const AdminDashboard = () => {
       return;
     }
 
+    const cleanedImageUrl = productForm.image_url.replace('http://localhost:5000', '');
+
     const formattedForm = {
       ...productForm,
+      image_url: cleanedImageUrl,
       price: parseFloat(productForm.price),
       stock: parseInt(productForm.stock) || 0
     };

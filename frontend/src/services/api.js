@@ -6,6 +6,8 @@ defaultProducts.forEach(product => {
   localImages[product.name] = product.image_url;
 });
 
+const BACKEND_URL = import.meta.env.MODE === "development" ? "http://localhost:5000" : "";
+
 const resolveLocalImages = (data) => {
   if (!data) return data;
   if (Array.isArray(data)) {
@@ -15,9 +17,18 @@ const resolveLocalImages = (data) => {
     if (data.name && !data.image_url && localImages[data.name]) {
       data.image_url = localImages[data.name];
     }
-    if (data.product && typeof data.product === 'object' && data.product.name) {
-      if (!data.product.image_url && localImages[data.product.name]) {
+    if (data.image_url && data.image_url.startsWith('/img/')) {
+      data.image_url = `${BACKEND_URL}${data.image_url}`;
+    }
+    if (data.url && data.url.startsWith('/img/')) {
+      data.url = `${BACKEND_URL}${data.url}`;
+    }
+    if (data.product && typeof data.product === 'object') {
+      if (data.product.name && !data.product.image_url && localImages[data.product.name]) {
         data.product.image_url = localImages[data.product.name];
+      }
+      if (data.product.image_url && data.product.image_url.startsWith('/img/')) {
+        data.product.image_url = `${BACKEND_URL}${data.product.image_url}`;
       }
     }
     if (data.items && Array.isArray(data.items)) {
