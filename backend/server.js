@@ -5,9 +5,6 @@ const helmet = require('helmet');
 const connectDB = require('./config/db');
 const { User, Product } = require('./models');
 const path = require('path');
-
-import { img } from './imgs/imggiver';
-
 // Import routes
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
@@ -60,7 +57,7 @@ const seedDatabase = async () => {
           description: 'A classic denim jacket tailored for a modern slim fit, constructed from organic cotton denim with subtle vintage washing.',
           price: 79.99,
           category: 'Fashion',
-          image_url: {img1},
+          image_url: '/imgs/Premium Slim-Fit Denim Jacket.jpg',
           stock: 45,
           tag: 'trending'
         },
