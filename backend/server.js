@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('express-mongo-sanitize');
 const connectDB = require('./config/db');
 const { User, Product } = require('./models');
 const path = require('path');
@@ -33,6 +32,28 @@ const authLimiter = rateLimit({
   message: { message: 'Too many authentication attempts. Please try again after 15 minutes.' }
 });
 
+// Custom NoSQL Query Sanitizer compatible with Express 5 (modifies query parameters in-place)
+const sanitizeObject = (obj) => {
+  if (obj && typeof obj === 'object') {
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        if (key.startsWith('$') || key.includes('.')) {
+          delete obj[key];
+        } else {
+          sanitizeObject(obj[key]);
+        }
+      }
+    }
+  }
+};
+
+const customMongoSanitize = (req, res, next) => {
+  if (req.body) sanitizeObject(req.body);
+  if (req.query) sanitizeObject(req.query);
+  if (req.params) sanitizeObject(req.params);
+  next();
+};
+
 // Middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -44,8 +65,8 @@ app.use(helmet({
 }));
 app.use(express.json());
 
-// Prevent NoSQL query injections
-app.use(mongoSanitize());
+// Prevent NoSQL query injections using custom sanitizer
+app.use(customMongoSanitize);
 
 // Apply rate limits
 app.use('/api', globalLimiter);
