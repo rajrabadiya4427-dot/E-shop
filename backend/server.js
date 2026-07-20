@@ -20,7 +20,8 @@ app.use(cors({
   credentials: true
 }));
 app.use(helmet({
-  crossOriginResourcePolicy: false // Allows loading external Unsplash images if requested in frontend
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: false
 }));
 app.use(express.json());
 app.use('/img', express.static(path.join(__dirname, 'img')));
