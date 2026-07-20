@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
   Users, Package, DollarSign, ShoppingBag, Plus, Trash2, Edit2, 
-  X, Check, AlertCircle, ShoppingCart, RefreshCw, Upload, Image as ImageIcon
+  X, Check, AlertCircle, ShoppingCart, RefreshCw, Upload, Image as ImageIcon, Home as HomeIcon
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -337,13 +338,21 @@ const AdminDashboard = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Admin Console</h1>
             <p className="text-xs text-gray-500 mt-1">Configure catalogs, verify transactions, and monitor registered directory lists.</p>
           </div>
-          <button 
-            onClick={fetchData}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 hover:border-gray-300 rounded-xl bg-white shadow-sm text-xs font-bold text-gray-600 self-start sm:self-center transition-all cursor-pointer"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh Console
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <Link 
+              to="/"
+              className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-sm text-xs font-bold transition-all cursor-pointer"
+            >
+              <HomeIcon size={14} /> Go to Storefront
+            </Link>
+            <button 
+              onClick={fetchData}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 hover:border-gray-300 rounded-xl bg-white shadow-sm text-xs font-bold text-gray-600 transition-all cursor-pointer"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh Console
+            </button>
+          </div>
         </div>
 
         {/* Dynamic Alerts */}
