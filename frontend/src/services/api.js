@@ -1,11 +1,10 @@
 import axios from 'axios';
-import img1 from "../img/Premium Slim-Fit Denim Jacket.jpg";
-import img2 from "../img/Minimalist Leather Sneakers.jpeg";
+import { defaultProducts } from '../data/defaultProducts';
 
-const localImages = {
-  'Premium Slim-Fit Denim Jacket': img1,
-  'Minimalist Leather Sneakers': img2,
-};
+const localImages = {};
+defaultProducts.forEach(product => {
+  localImages[product.name] = product.image_url;
+});
 
 const resolveLocalImages = (data) => {
   if (!data) return data;
@@ -13,11 +12,11 @@ const resolveLocalImages = (data) => {
     return data.map(item => resolveLocalImages(item));
   }
   if (typeof data === 'object') {
-    if (data.name && localImages[data.name]) {
+    if (data.name && !data.image_url && localImages[data.name]) {
       data.image_url = localImages[data.name];
     }
     if (data.product && typeof data.product === 'object' && data.product.name) {
-      if (localImages[data.product.name]) {
+      if (!data.product.image_url && localImages[data.product.name]) {
         data.product.image_url = localImages[data.product.name];
       }
     }
