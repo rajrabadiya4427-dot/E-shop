@@ -10,10 +10,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Configure multer storage to backend/img/
+// Configure multer storage to frontend/public/img/
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, '..', 'img');
+    const uploadPath = path.join(__dirname, '..', '..', 'frontend', 'public', 'img');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -39,12 +39,23 @@ const upload = multer({
 });
 
 // @route   POST /api/admin/upload
-// @desc    Upload product image to backend/img
+// @desc    Upload product image to frontend/public/img
 router.post('/upload', upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
+    
+    // Copy the file to frontend/dist/img/ if the production build directory exists
+    const devPath = req.file.path;
+    const prodDir = path.join(__dirname, '..', '..', 'frontend', 'dist', 'img');
+    if (fs.existsSync(path.join(__dirname, '..', '..', 'frontend', 'dist'))) {
+      if (!fs.existsSync(prodDir)) {
+        fs.mkdirSync(prodDir, { recursive: true });
+      }
+      fs.copyFileSync(devPath, path.join(prodDir, req.file.filename));
+    }
+    
     const fileUrl = `/img/${req.file.filename}`;
     res.json({ url: fileUrl });
   } catch (error) {
