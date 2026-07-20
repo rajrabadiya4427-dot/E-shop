@@ -212,6 +212,12 @@ const AdminDashboard = () => {
     setActionLoading(true);
     setError('');
 
+    if (!productForm.image_url) {
+      triggerNotification('error', 'Please upload an image or provide an image URL');
+      setActionLoading(false);
+      return;
+    }
+
     const formattedForm = {
       ...productForm,
       price: parseFloat(productForm.price),
@@ -777,9 +783,8 @@ const AdminDashboard = () => {
 
                   {/* Fallback Direct Input */}
                   <input 
-                    type="url" 
+                    type="text" 
                     name="image_url"
-                    required
                     value={productForm.image_url}
                     onChange={handleFormChange}
                     placeholder="Or paste direct image URL (https://...)"
