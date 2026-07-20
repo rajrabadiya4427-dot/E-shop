@@ -30,6 +30,15 @@ export const api = {
     return res.data;
   },
 
+  upload: async (endpoint, formData) => {
+    const res = await apiInstance.post(endpoint, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return res.data;
+  },
+
   put: async (endpoint, data) => {
     const res = await apiInstance.put(endpoint, data);
     return res.data;

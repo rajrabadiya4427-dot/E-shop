@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { 
   Users, Package, DollarSign, ShoppingBag, Plus, Trash2, Edit2, 
-  X, Check, AlertCircle, ShoppingCart, RefreshCw 
+  X, Check, AlertCircle, ShoppingCart, RefreshCw, Upload, Image as ImageIcon
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -17,6 +17,8 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [newOrderNotification, setNewOrderNotification] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   // Modal State for Product CRUD
   const [showModal, setShowModal] = useState(false);
@@ -151,6 +153,57 @@ const AdminDashboard = () => {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setProductForm({ ...productForm, [name]: value });
+  };
+
+  // Drag and Drop Handlers
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const uploadImageFile = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Only image files are allowed!');
+      return;
+    }
+    setUploading(true);
+    setError('');
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      const data = await api.upload('/admin/upload', formData);
+      setProductForm(prev => ({
+        ...prev,
+        image_url: data.url
+      }));
+      triggerNotification('success', 'Image uploaded successfully!');
+    } catch (err) {
+      console.error(err);
+      triggerNotification('error', err.message || 'Image upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      uploadImageFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      uploadImageFile(e.target.files[0]);
+    }
   };
 
   // Submit Product Form (Create / Update)
@@ -636,7 +689,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Category</label>
                     <select 
@@ -651,32 +704,87 @@ const AdminDashboard = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Direct Image URL</label>
-                    <input 
-                      type="url" 
-                      name="image_url"
-                      required
-                      value={productForm.image_url}
+                    <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Product Promotion Tag</label>
+                    <select 
+                      name="tag"
+                      value={productForm.tag}
                       onChange={handleFormChange}
-                      placeholder="https://images.unsplash.com/..."
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                    />
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer bg-white"
+                    >
+                      <option value="none">Standard (No Promo Section)</option>
+                      <option value="trending">Suggested For You / Trending</option>
+                      <option value="offer">Deals & Offers</option>
+                      <option value="new">New Arrivals</option>
+                    </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Product Promotion Tag</label>
-                  <select 
-                    name="tag"
-                    value={productForm.tag}
-                    onChange={handleFormChange}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer bg-white"
+                  <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Product Image</label>
+                  
+                  {/* Drag and Drop Zone */}
+                  <div 
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[120px] mb-2 ${
+                      dragActive ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/30'
+                    }`}
+                    onClick={() => document.getElementById('image-file-input').click()}
                   >
-                    <option value="none">Standard (No Promo Section)</option>
-                    <option value="trending">Suggested For You / Trending</option>
-                    <option value="offer">Deals & Offers</option>
-                    <option value="new">New Arrivals</option>
-                  </select>
+                    <input 
+                      id="image-file-input"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    
+                    {uploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <RefreshCw size={20} className="text-blue-500 animate-spin" />
+                        <span className="text-[11px] text-gray-500 font-semibold">Uploading image...</span>
+                      </div>
+                    ) : productForm.image_url ? (
+                      <div className="flex items-center gap-4 w-full">
+                        <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
+                          <img src={productForm.image_url} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="text-left overflow-hidden flex-grow">
+                          <p className="text-[9px] text-green-600 font-bold uppercase mb-0.5">Image Selected</p>
+                          <p className="text-[10px] text-gray-500 truncate">{productForm.image_url}</p>
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProductForm(prev => ({ ...prev, image_url: '' }));
+                            }}
+                            className="text-[10px] text-red-500 font-bold hover:underline mt-1 focus:outline-none"
+                          >
+                            Remove Image
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload size={20} className="text-gray-400" />
+                        <span className="text-[11px] text-gray-600 font-medium">Drag & drop image here, or <span className="text-blue-500 font-bold hover:underline">browse</span></span>
+                        <span className="text-[9px] text-gray-400">Supports JPG, PNG, WEBP, GIF</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fallback Direct Input */}
+                  <input 
+                    type="url" 
+                    name="image_url"
+                    required
+                    value={productForm.image_url}
+                    onChange={handleFormChange}
+                    placeholder="Or paste direct image URL (https://...)"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                  />
                 </div>
 
                 <div className="pt-4 border-t border-gray-100 flex justify-end gap-2">

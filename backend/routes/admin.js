@@ -6,6 +6,52 @@ const { authMiddleware, adminOnly } = require('../middleware/auth');
 router.use(authMiddleware);
 router.use(adminOnly);
 
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure multer storage to backend/img/
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, '..', 'img');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: function (req, file, cb) {
+    const filetypes = /jpeg|jpg|png|webp|gif/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error("Only image files (.jpg, .jpeg, .png, .webp, .gif) are allowed!"));
+  }
+});
+
+// @route   POST /api/admin/upload
+// @desc    Upload product image to backend/img
+router.post('/upload', upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    const fileUrl = `/img/${req.file.filename}`;
+    res.json({ url: fileUrl });
+  } catch (error) {
+    res.status(500).json({ message: 'Error uploading image', error: error.message });
+  }
+});
+
 // Format helper to match frontend expectations
 const formatOrder = (orderObj) => {
   if (!orderObj) return null;
