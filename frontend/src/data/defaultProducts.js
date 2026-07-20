@@ -1,5 +1,5 @@
 import img1 from "../img/Premium Slim-Fit Denim Jacket.jpg"
-import img2 from "../Minimalist Leather Sneakers.jpeg"
+import img2 from "../img/Minimalist Leather Sneakers.jpeg"
 
 
 export const defaultProducts = [
@@ -9,7 +9,7 @@ export const defaultProducts = [
     description: 'A classic denim jacket tailored for a modern slim fit, constructed from organic cotton denim with subtle vintage washing.',
     price: 79.99,
     category: 'Fashion',
-    image_url:{img1},
+    image_url: img1,
     stock: 45,
     tag: 'trending'
   },
@@ -19,7 +19,7 @@ export const defaultProducts = [
     description: 'Clean silhouette sneakers made with full-grain calfskin leather, memory foam insoles, and natural rubber outsoles.',
     price: 129.99,
     category: 'Fashion',
-    image_url: {img2},
+    image_url: img2,
     stock: 30,
     tag: 'none'
   },
