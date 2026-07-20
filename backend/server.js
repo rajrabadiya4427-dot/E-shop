@@ -23,6 +23,7 @@ app.use(helmet({
   crossOriginResourcePolicy: false // Allows loading external Unsplash images if requested in frontend
 }));
 app.use(express.json());
+app.use('/img', express.static(path.join(__dirname, 'img')));
 app.use((req, res, next) => {
   console.log(`[API] ${req.method} ${req.url}`);
   next();
@@ -57,7 +58,7 @@ const seedDatabase = async () => {
           description: 'A classic denim jacket tailored for a modern slim fit, constructed from organic cotton denim with subtle vintage washing.',
           price: 79.99,
           category: 'Fashion',
-          image_url: '/imgs/Premium Slim-Fit Denim Jacket.jpg',
+          image_url: '/img/Premium Slim-Fit Denim Jacket.jpg',
           stock: 45,
           tag: 'trending'
         },
