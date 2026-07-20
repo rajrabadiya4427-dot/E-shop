@@ -56,7 +56,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Please enter all fields' });
     }
 
-    const user = await User.findOne({ email }); // Updated for Mongoose
+    const user = await User.findOne({ email }).select('+password'); // Explicitly select password for comparison
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }

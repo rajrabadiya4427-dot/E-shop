@@ -243,4 +243,18 @@ router.put('/orders/:id/status', async (req, res) => {
   }
 });
 
+// @route   DELETE /api/admin/orders/:id
+// @desc    Delete an order
+router.delete('/orders/:id', async (req, res) => {
+  try {
+    const order = await Order.findByIdAndDelete(req.params.id);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    res.json({ message: 'Order deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error deleting order', error: error.message });
+  }
+});
+
 module.exports = router;

@@ -305,6 +305,26 @@ const AdminDashboard = () => {
     }
   };
 
+  // Delete Order
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to delete this order?')) return;
+    setActionLoading(true);
+    try {
+      await api.delete(`/admin/orders/${orderId}`);
+      setOrders(orders.filter((o) => o.id !== orderId));
+      triggerNotification('success', 'Order deleted successfully!');
+      
+      // Sync stats
+      const statsData = await api.get('/admin/stats');
+      setStats(statsData);
+    } catch (err) {
+      console.error(err);
+      triggerNotification('error', err.message || 'Failed to delete order');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50/50 py-8 px-4 sm:px-6 lg:px-8 relative">
       {/* Real-time Order Notification Toast */}
@@ -520,75 +540,95 @@ const AdminDashboard = () => {
                     <th className="py-4 px-6">Payment Mode</th>
                     <th className="py-4 px-6">Payment status</th>
                     <th className="py-4 px-6">Delivery status</th>
+                    <th className="py-4 px-6 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-xs">
-                  {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 px-6 font-mono font-bold text-gray-800">
-                        {order.id.slice(0, 8)}...
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="font-bold text-gray-800">{order.user?.name || 'Unknown'}</div>
-                        <div className="text-[10px] text-gray-400 font-medium">{order.user?.email || 'N/A'}</div>
-                        <div className="text-[9px] text-slate-500 mt-1 max-w-xs truncate" title={order.shipping_address}>
-                          Addr: {order.shipping_address}
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="max-w-[180px] space-y-0.5">
-                          {order.items?.map((item) => (
-                            <div key={item.id} className="text-[10px] truncate text-slate-500">
-                              • {item.product?.name || 'Deleted Product'} <strong>(x{item.quantity})</strong>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="font-black text-gray-900 mt-1.5">${order.total_amount.toFixed(2)}</div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="font-semibold uppercase text-gray-500">{order.payment_method}</div>
-                        {order.payment_method === 'UPI' && order.transaction_id && (
-                          <div className="text-[9px] text-blue-600 font-extrabold mt-1 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 select-all" title="Click to copy UPI Ref ID">
-                            UTR: {order.transaction_id}
+                  {orders.map((order) => {
+                    const subtotal = order.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
+                    return (
+                      <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-4 px-6 font-mono font-bold text-gray-800">
+                          {order.id.slice(0, 8)}...
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="font-bold text-gray-800">{order.user?.name || 'Unknown'}</div>
+                          <div className="text-[10px] text-gray-400 font-medium">{order.user?.email || 'N/A'}</div>
+                          <div className="text-[9px] text-slate-500 mt-1 max-w-xs truncate" title={order.shipping_address}>
+                            Addr: {order.shipping_address}
                           </div>
-                        )}
-                      </td>
-                      <td className="py-4 px-6">
-                        <select 
-                          value={order.payment_status}
-                          onChange={(e) => handleOrderPaymentStatusChange(order.id, e.target.value)}
-                          className={`border rounded-lg px-2 py-1 font-semibold text-[10px] outline-none ${
-                            order.payment_status === 'Paid' ? 'border-green-200 text-green-600 bg-green-50' : 
-                            (order.payment_status === 'Pending Verification' ? 'border-blue-200 text-blue-600 bg-blue-50' : 'border-orange-200 text-orange-600 bg-orange-50')
-                          }`}
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Pending Verification">Verification Pending</option>
-                          <option value="Paid">Paid</option>
-                          <option value="Failed">Failed</option>
-                        </select>
-                      </td>
-                      <td className="py-4 px-6">
-                        <select 
-                          value={order.status}
-                          onChange={(e) => handleOrderStatusChange(order.id, e.target.value)}
-                          className={`border rounded-lg px-2 py-1 font-semibold text-[10px] outline-none ${
-                            order.status === 'Delivered' 
-                              ? 'border-green-200 text-green-600 bg-green-50' 
-                              : order.status === 'Cancelled'
-                              ? 'border-red-200 text-red-600 bg-red-50'
-                              : 'border-blue-200 text-blue-600 bg-blue-50'
-                          }`}
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Processing">Processing</option>
-                          <option value="Shipped">Shipped</option>
-                          <option value="Delivered">Delivered</option>
-                          <option value="Cancelled">Cancelled</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="max-w-[180px] space-y-0.5">
+                            {order.items?.map((item) => (
+                              <div key={item.id} className="text-[10px] truncate text-slate-500">
+                                • {item.product?.name || 'Deleted Product'} <strong>(x{item.quantity})</strong>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-2 space-y-0.5">
+                            <div className="text-[10px] text-gray-500">
+                              Real: <span className="font-semibold text-gray-700">${subtotal.toFixed(2)}</span>
+                            </div>
+                            <div className="text-[10px] text-gray-500">
+                              Charged: <span className="font-bold text-blue-600">${order.total_amount.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="font-semibold uppercase text-gray-500">{order.payment_method}</div>
+                          {order.payment_method === 'UPI' && order.transaction_id && (
+                            <div className="text-[9px] text-blue-600 font-extrabold mt-1 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 select-all" title="Click to copy Transaction ID">
+                              Txn ID: {order.transaction_id}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 px-6">
+                          <select 
+                            value={order.payment_status}
+                            onChange={(e) => handleOrderPaymentStatusChange(order.id, e.target.value)}
+                            className={`border rounded-lg px-2 py-1 font-semibold text-[10px] outline-none ${
+                              order.payment_status === 'Paid' ? 'border-green-200 text-green-600 bg-green-50' : 
+                              (order.payment_status === 'Pending Verification' ? 'border-blue-200 text-blue-600 bg-blue-50' : 'border-orange-200 text-orange-600 bg-orange-50')
+                            }`}
+                          >
+                            <option value="Pending">Pending</option>
+                            <option value="Pending Verification">Verification Pending</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Failed">Failed</option>
+                          </select>
+                        </td>
+                        <td className="py-4 px-6">
+                          <select 
+                            value={order.status}
+                            onChange={(e) => handleOrderStatusChange(order.id, e.target.value)}
+                            className={`border rounded-lg px-2 py-1 font-semibold text-[10px] outline-none ${
+                              order.status === 'Delivered' 
+                                ? 'border-green-200 text-green-600 bg-green-50' 
+                                : order.status === 'Cancelled'
+                                ? 'border-red-200 text-red-600 bg-red-50'
+                                : 'border-blue-200 text-blue-600 bg-blue-50'
+                            }`}
+                          >
+                            <option value="Pending">Pending</option>
+                            <option value="Processing">Processing</option>
+                            <option value="Shipped">Shipped</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <button 
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Order"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

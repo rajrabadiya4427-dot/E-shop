@@ -83,7 +83,10 @@ const Checkout = () => {
 
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState('UPI'); // 'UPI', 'COD'
-  const [transactionId, setTransactionId] = useState('');
+  
+  // Razorpay and Mock state variables
+  const [showMockModal, setShowMockModal] = useState(false);
+  const [mockPaymentData, setMockPaymentData] = useState(null);
 
   const subtotal = getCartTotal();
   const shipping = subtotal > 100 ? 0 : 10;
@@ -102,19 +105,63 @@ const Checkout = () => {
     }
   };
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleCancelPayment = async (orderId) => {
+    try {
+      await api.post(`/orders/${orderId}/cancel-payment`);
+      setError('Payment cancelled. Stock restored and order cancelled.');
+    } catch (err) {
+      console.error('[Payment] Error cancelling payment session:', err);
+    }
+  };
+
+  const handleMockPaymentResponse = async (isSuccess) => {
+    setShowMockModal(false);
+    if (!isSuccess) {
+      setError('Payment simulation declined or failed.');
+      await handleCancelPayment(mockPaymentData.order_id);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.post('/orders/verify', {
+        order_id: mockPaymentData.order_id,
+        razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substr(2, 9),
+        razorpay_order_id: mockPaymentData.id,
+        razorpay_signature: 'sig_mock_' + Math.random().toString(36).substr(2, 24),
+        is_mock: true
+      });
+
+      if (response.success) {
+        setPlacedOrder(response.order);
+        clearCart();
+        setStep(3);
+      } else {
+        setError('Payment verification failed.');
+      }
+    } catch (err) {
+      console.error('[Payment] Mock verification failed:', err);
+      setError(err.message || 'Payment verification failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    // Validation
-    if (paymentMethod === 'UPI') {
-      if (!transactionId || transactionId.trim().length !== 12) {
-        setError('Please enter a valid 12-digit UPI UTR Transaction Reference ID to verify your payment.');
-        setLoading(false);
-        return;
-      }
-    }
 
     try {
       const shipping_address = `${address}, ${city}, ${state} - ${zip}`;
@@ -124,20 +171,88 @@ const Checkout = () => {
       }));
 
       // Place order via API
-      const order = await api.post('/orders', {
+      const result = await api.post('/orders', {
         shipping_address,
         payment_method: paymentMethod,
-        transaction_id: paymentMethod === 'UPI' ? transactionId.trim() : undefined,
         items
       });
 
-      setPlacedOrder(order);
-      clearCart();
-      setStep(3);
+      if (paymentMethod === 'UPI' && result.payment_session) {
+        const session = result.payment_session;
+        if (session.isMock) {
+          // Open custom React modal simulator
+          setMockPaymentData({
+            id: session.id,
+            amount: session.amount,
+            order_id: result.id
+          });
+          setShowMockModal(true);
+        } else {
+          // Open real Razorpay Checkout overlay
+          const scriptLoaded = await loadRazorpayScript();
+          if (!scriptLoaded) {
+            setError('Failed to load Razorpay Payment Gateway. Check your internet connection.');
+            setLoading(false);
+            return;
+          }
+
+          const options = {
+            key: session.key_id,
+            amount: session.amount,
+            currency: session.currency,
+            name: "E-Shop Store",
+            description: `Payment for Order #${result.id.slice(-6)}`,
+            order_id: session.id,
+            handler: async function (response) {
+              setLoading(true);
+              try {
+                const verifyRes = await api.post('/orders/verify', {
+                  order_id: result.id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature
+                });
+                
+                if (verifyRes.success) {
+                  setPlacedOrder(verifyRes.order);
+                  clearCart();
+                  setStep(3);
+                } else {
+                  setError('Payment verification failed.');
+                }
+              } catch (verifyErr) {
+                setError(verifyErr.message || 'Payment verification failed.');
+              } finally {
+                setLoading(false);
+              }
+            },
+            modal: {
+              ondismiss: async function () {
+                setLoading(false);
+                await handleCancelPayment(result.id);
+              }
+            },
+            prefill: {
+              name: "Customer",
+              email: "customer@example.com"
+            },
+            theme: {
+              color: "#2563EB"
+            }
+          };
+
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+        }
+      } else {
+        // COD order
+        setPlacedOrder(result);
+        clearCart();
+        setStep(3);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('[Payment] Placement error:', err);
       setError(err.message || 'Failed to place order. Try again.');
-    } finally {
       setLoading(false);
     }
   };
@@ -305,43 +420,18 @@ const Checkout = () => {
                 </button>
               </div>
 
-              {/* UPI INTERFACE */}
+              {/* UPI / RAZORPAY INTERFACE */}
               {paymentMethod === 'UPI' && (
-                <div className="pt-4 border-t border-gray-100 text-center flex flex-col items-center py-6">
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm mb-4">
-                    {/* Dynamically generated QR code using user's decoded UPI details */}
-                    <div className="w-44 h-44 bg-white border border-slate-100 rounded-xl flex items-center justify-center p-2">
-                      <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=9328917737@ptsbi%26pn=RABADIYA%2520RAJ%2520BHARAT%26am=${grandTotal.toFixed(2)}%26cu=INR`} 
-                        alt="UPI QR Code" 
-                        className="w-full h-full object-contain rounded-lg"
-                      />
-                    </div>
+                <div className="pt-4 border-t border-gray-100 text-center flex flex-col items-center py-8 px-4 bg-slate-50/50 rounded-2xl border border-dashed border-gray-200">
+                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3">
+                    <QrCode size={24} />
                   </div>
-                  <h4 className="font-bold text-gray-800 text-sm">Scan to Pay: ${grandTotal.toFixed(2)}</h4>
-                  <div className="bg-blue-50/70 border border-blue-100/50 rounded-xl p-2.5 mt-2 text-[10px] text-blue-800 font-bold max-w-xs text-left space-y-1">
-                    <p className="flex justify-between"><span>Payee Name:</span> <span className="font-extrabold text-blue-900">RABADIYA RAJ BHARAT</span></p>
-                    <p className="flex justify-between"><span>UPI ID:</span> <span className="font-extrabold text-blue-900 select-all">9328917737@ptsbi</span></p>
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-2 max-w-xs leading-normal">
-                    Open BHIM, GPay, Paytm, PhonePe or any banking app to scan. The transaction amount of <strong>${grandTotal.toFixed(2)}</strong> is pre-filled automatically!
+                  <h4 className="font-extrabold text-gray-800 text-sm">Pay Securely Online</h4>
+                  <p className="text-xs text-gray-500 max-w-sm mt-1 leading-normal">
+                    You can pay the full amount of <strong className="text-gray-800">${grandTotal.toFixed(2)}</strong> using Google Pay, Paytm, PhonePe, Debit/Credit Card, Net Banking, or digital wallets.
                   </p>
-                  
-                  {/* UTR Input Form block */}
-                  <div className="w-full max-w-xs text-left space-y-1.5 mt-4">
-                    <label className="text-[9px] font-bold text-gray-500 uppercase block tracking-wider">UPI Ref No / Transaction ID (UTR)</label>
-                    <input 
-                      type="text"
-                      maxLength={12}
-                      required
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value.replace(/\D/g, ''))}
-                      placeholder="Enter 12-digit Ref No"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-center font-bold tracking-widest text-gray-700 bg-white"
-                    />
-                    <span className="text-[8px] text-gray-400 block text-center leading-normal">
-                      Ex: 4056XXXXXXXX or 3982XXXXXXXX (Check your UPI debit message or bank receipt)
-                    </span>
+                  <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 rounded-full font-bold text-[10px] uppercase tracking-wider border border-green-100 animate-pulse">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Secure Auto-verification Active
                   </div>
                 </div>
               )}
@@ -444,6 +534,58 @@ const Checkout = () => {
               >
                 Back to Shop Catalog
               </Link>
+            </div>
+          </div>
+        )}
+
+        {/* RZP SIMULATOR MODAL FOR TESTING */}
+        {showMockModal && mockPaymentData && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-gray-100 overflow-hidden relative flex flex-col p-6 space-y-6 text-center animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+                <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
+                  <QrCode size={18} className="text-blue-600 animate-pulse" /> Razorpay Payment Gateway Simulator
+                </h3>
+                <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">Test Mode</span>
+              </div>
+              
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Transaction Amount</span>
+                <div className="text-3xl font-black text-blue-600 font-mono">${(mockPaymentData.amount / 100).toFixed(2)}</div>
+                <p className="text-xs text-gray-500 leading-normal max-w-xs mx-auto">
+                  Verify the dynamic checkout flow immediately. Simulated payment credentials will be cryptographically verified by your server.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200/50 rounded-2xl p-4 text-xs text-left space-y-2 text-slate-500">
+                <div className="flex justify-between"><span>Merchant Store:</span> <span className="font-bold text-gray-800">E-Shop Store</span></div>
+                <div className="flex justify-between"><span>Payment Session:</span> <span className="font-mono text-gray-800 text-[10px] truncate max-w-[180px]">{mockPaymentData.id}</span></div>
+                <div className="flex justify-between"><span>Payment Options:</span> <span className="font-bold text-gray-800">All UPI & Credit Cards</span></div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  onClick={() => handleMockPaymentResponse(true)}
+                  className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 size={14} /> Simulate Payment Success
+                </button>
+                <button
+                  onClick={() => handleMockPaymentResponse(false)}
+                  className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                >
+                  Simulate Payment Failure
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMockModal(false);
+                    handleCancelPayment(mockPaymentData.order_id);
+                  }}
+                  className="w-full py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-500 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancel & Exit Checkout
+                </button>
+              </div>
             </div>
           </div>
         )}
