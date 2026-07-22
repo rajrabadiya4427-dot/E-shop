@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import Hero from '../components/home/Hero';
 import ProductCard from '../components/ProductCard';
 import { api } from '../services/api';
+import { defaultProducts } from '../data/defaultProducts';
 import { ArrowUpDown, Flame, Sparkles, Gift, Truck, ShieldCheck, Headset, RotateCcw, Star } from 'lucide-react';
 
 // Subcomponent: Services Section
@@ -166,7 +167,24 @@ const Home = () => {
         setProducts(data);
       } catch (err) {
         console.error(err);
-        setError('Failed to fetch products');
+        // Fallback filter using defaultProducts if API fails
+        if (search) {
+          const lower = search.toLowerCase();
+          const words = lower.split(/\s+/).filter(Boolean);
+          const filtered = defaultProducts.filter(p => {
+            const name = p.name.toLowerCase();
+            const desc = (p.description || '').toLowerCase();
+            const cat = (p.category || '').toLowerCase();
+            return words.some(w => name.includes(w) || desc.includes(w) || cat.includes(w));
+          }).sort((a, b) => {
+            const aInName = words.filter(w => a.name.toLowerCase().includes(w)).length;
+            const bInName = words.filter(w => b.name.toLowerCase().includes(w)).length;
+            return bInName - aInName;
+          });
+          setProducts(filtered);
+        } else {
+          setProducts(defaultProducts);
+        }
       } finally {
         setLoading(false);
       }

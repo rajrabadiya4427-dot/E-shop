@@ -14,22 +14,56 @@ router.get('/', async (req, res) => {
     }
 
     if (search) {
-      const words = search.split(/\s+/).filter(Boolean);
+      const cleanSearch = search.trim();
+      const escaped = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const words = cleanSearch.split(/\s+/).filter(Boolean).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      
       if (words.length > 0) {
-        query.$and = words.map(word => {
-          const regex = { $regex: word, $options: 'i' };
-          return {
-            $or: [
-              { name: regex },
-              { description: regex },
-              { category: regex }
-            ]
-          };
-        });
+        query.$or = [
+          { name: { $regex: escaped, $options: 'i' } },
+          { category: { $regex: escaped, $options: 'i' } },
+          { description: { $regex: escaped, $options: 'i' } },
+          ...words.map(w => ({ name: { $regex: w, $options: 'i' } })),
+          ...words.map(w => ({ category: { $regex: w, $options: 'i' } })),
+          ...words.map(w => ({ description: { $regex: w, $options: 'i' } }))
+        ];
       }
     }
 
-    const products = await Product.find(query);
+    let products = await Product.find(query);
+
+    // If search is active, rank products by relevance to product name
+    if (search) {
+      const lowerSearch = search.trim().toLowerCase();
+      const searchWords = lowerSearch.split(/\s+/).filter(Boolean);
+
+      products.sort((a, b) => {
+        const aName = (a.name || '').toLowerCase();
+        const bName = (b.name || '').toLowerCase();
+
+        // Exact product name match
+        if (aName === lowerSearch) return -1;
+        if (bName === lowerSearch) return 1;
+
+        // Name starts with full search query
+        if (aName.startsWith(lowerSearch) && !bName.startsWith(lowerSearch)) return -1;
+        if (!aName.startsWith(lowerSearch) && bName.startsWith(lowerSearch)) return 1;
+
+        // Name contains full search query substring
+        if (aName.includes(lowerSearch) && !bName.includes(lowerSearch)) return -1;
+        if (!aName.includes(lowerSearch) && bName.includes(lowerSearch)) return 1;
+
+        // Count how many search words appear in product name
+        const aNameMatches = searchWords.filter(w => aName.includes(w)).length;
+        const bNameMatches = searchWords.filter(w => bName.includes(w)).length;
+
+        if (aNameMatches !== bNameMatches) {
+          return bNameMatches - aNameMatches;
+        }
+
+        return 0;
+      });
+    }
     
     // Map _id to id for frontend compatibility
     const mappedProducts = products.map(product => {
